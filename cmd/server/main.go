@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -19,6 +20,7 @@ import (
 
 	"github.com/labstack/echo/v5"
 	"github.com/labstack/echo/v5/middleware"
+	"github.com/joho/godotenv"
 )
 
 type TemplateRenderer struct {
@@ -30,6 +32,8 @@ func (r *TemplateRenderer) Render(c *echo.Context, w io.Writer, name string, dat
 }
 
 func main() {
+	godotenv.Load(".env")
+
 	if err := server.ReadAndPrintFile("doom.txt", "cyan"); err != nil {
 		fmt.Println("Error:", err)
 	}
@@ -50,6 +54,9 @@ func main() {
 	}))
 
 	hub := ws.NewHub()
+
+	initAuthRoutes(e)
+	applyAuthMiddleware(e)
 
 	// Operational REST Endpoints
 	e.GET("/", func(c *echo.Context) error {
@@ -76,8 +83,15 @@ func main() {
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer cancel()
 
+	addr := os.Getenv("PORT")
+	if addr == "" {
+		addr = ":8182"
+	} else if !strings.HasPrefix(addr, ":") {
+		addr = ":" + addr
+	}
+
 	sc := echo.StartConfig{
-		Address:         ":8080",
+		Address:         addr,
 		GracefulTimeout: 10 * time.Second,
 	}
 
