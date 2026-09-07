@@ -375,6 +375,24 @@
         <button type="button" class="modal-toggle" id="openNodes">Select Nodes</button>
     </div>
 
+    <div class="sidebar-footer">
+        <div class="btn-row">
+            <button id="build-docker-btn" class="btn waves-effect waves-light" style="background: var(--accent); color: #000;">
+                <span class="material-icons-round left">build</span>
+                Build Server (DOCKER)
+            </button>
+            <button id="build-github-btn" class="btn waves-effect waves-light" style="background: transparent; color: var(--accent); border: 1px solid var(--accent);">
+                <span class="material-icons-round left">cloud_sync</span>
+                Build Server (GITHUB CI)
+            </button>
+        </div>
+        <a id="download-server-link" class="btn waves-effect waves-light" href="/download_server" style="background: transparent; color: var(--accent); border: 1px solid var(--accent);">
+            <span class="material-icons-round left">download</span>
+            Download Server
+        </a>
+        <div id="build-status" class="build-status"></div>
+    </div>
+
     <form id="taskForm">
         <div class="row">
             <div class="form-group">
@@ -749,6 +767,109 @@
 
     // Initial roster load (modal polling keeps it fresh while open)
     fetchNodes();
+
+    // Build Docker handler
+    document.getElementById("build-docker-btn").addEventListener("click", function () {
+        const btn = document.getElementById("build-docker-btn");
+        const status = document.getElementById("build-status");
+        btn.disabled = true;
+        btn.innerHTML = '<span class="material-icons-round left">hourglass_empty</span>Building...';
+        status.textContent = "Starting Docker build...";
+        status.style.color = "var(--accent)";
+
+        fetch("/build_docker", { method: "POST" })
+            .then(res => res.json())
+            .then(data => {
+                if (data.status === "building") {
+                    status.textContent = "Docker build started...";
+                    pollBuildStatus();
+                } else {
+                    throw new Error(data.error || "Build failed to start");
+                }
+            })
+            .catch(err => {
+                btn.disabled = false;
+                btn.innerHTML = '<span class="material-icons-round left">build</span>Build Server (DOCKER)';
+                status.textContent = "Build failed: " + err.message;
+                status.style.color = "var(--danger)";
+            });
+    });
+
+    // Build GitHub CI handler
+    document.getElementById("build-github-btn").addEventListener("click", function () {
+        const btn = document.getElementById("build-github-btn");
+        const status = document.getElementById("build-status");
+        btn.disabled = true;
+        btn.innerHTML = '<span class="material-icons-round left">hourglass_empty</span>Building...';
+        status.textContent = "Starting GitHub CI build...";
+        status.style.color = "var(--accent)";
+
+        fetch("/build_github", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ repo_url: "" })
+        })
+            .then(res => res.json())
+            .then(data => {
+                if (data.status === "building") {
+                    status.textContent = "GitHub CI build started...";
+                    pollBuildStatus();
+                } else {
+                    throw new Error(data.error || "Build failed to start");
+                }
+            })
+            .catch(err => {
+                btn.disabled = false;
+                btn.innerHTML = '<span class="material-icons-round left">cloud_sync</span>Build Server (GITHUB CI)';
+                status.textContent = "Build failed: " + err.message;
+                status.style.color = "var(--danger)";
+            });
+    });
+
+    function pollBuildStatus() {
+        fetch("/build_status")
+            .then(res => res.json())
+            .then(data => {
+                const dockerBtn = document.getElementById("build-docker-btn");
+                const githubBtn = document.getElementById("build-github-btn");
+                const downloadLink = document.getElementById("download-server-link");
+                const status = document.getElementById("build-status");
+
+                if (data.status === "building") {
+                    dockerBtn.disabled = true;
+                    dockerBtn.innerHTML = '<span class="material-icons-round left">hourglass_empty</span>Building...';
+                    githubBtn.disabled = true;
+                    githubBtn.innerHTML = '<span class="material-icons-round left">hourglass_empty</span>Building...';
+                    downloadLink.style.pointerEvents = "none";
+                    downloadLink.style.opacity = "0.4";
+                    status.textContent = "Build in progress...";
+                    status.style.color = "var(--accent)";
+                    setTimeout(pollBuildStatus, 5000);
+                } else if (data.status === "error") {
+                    dockerBtn.disabled = false;
+                    dockerBtn.innerHTML = '<span class="material-icons-round left">build</span>Build Server (DOCKER)';
+                    githubBtn.disabled = false;
+                    githubBtn.innerHTML = '<span class="material-icons-round left">cloud_sync</span>Build Server (GITHUB CI)';
+                    downloadLink.style.pointerEvents = "none";
+                    downloadLink.style.opacity = "0.4";
+                    status.textContent = "Build failed: " + (data.error || "Unknown error");
+                    status.style.color = "var(--danger)";
+                } else if (data.status === "done") {
+                    dockerBtn.disabled = false;
+                    dockerBtn.innerHTML = '<span class="material-icons-round left">build</span>Build Server (DOCKER)';
+                    githubBtn.disabled = false;
+                    githubBtn.innerHTML = '<span class="material-icons-round left">cloud_sync</span>Build Server (GITHUB CI)';
+                    downloadLink.style.pointerEvents = "auto";
+                    downloadLink.style.opacity = "1";
+                    status.textContent = "Build complete - ready to download";
+                    status.style.color = "var(--accent)";
+                }
+            })
+            .catch(err => {
+                console.error("Build status error:", err);
+                setTimeout(pollBuildStatus, 5000);
+            });
+    }
 </script>
 
 </body>
