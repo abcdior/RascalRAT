@@ -19,35 +19,32 @@ func applyAuthMiddleware(e *echo.Echo) {
 	public := []string{
 		"/validate_token",
 		"/logout",
-		"/static/",
+		"/assets/",
 		"/favicon.ico",
+		"/ws/connect",
 	}
 	protected := []string{
 		"/",
 		"/status",
 		"/nodes",
 		"/nodes/task",
-		"/ws/connect",
 	}
 
 	e.Use(func(next echo.HandlerFunc) echo.HandlerFunc {
 		return func(c *echo.Context) error {
-			p := c.Path()
+			requestPath := c.Request().URL.Path
 			for _, prefix := range public {
-				if p == prefix || strings.HasPrefix(p, prefix) {
+				if requestPath == prefix || strings.HasPrefix(requestPath, prefix) {
 					return next(c)
 				}
 			}
 			for _, prefix := range protected {
-				if p == prefix || strings.HasPrefix(p, prefix) {
+				if c.Path() == prefix || strings.HasPrefix(c.Path(), prefix) {
 					if !isAuthenticated(c) {
 						if strings.HasPrefix(c.Path(), "/api/") {
 							return c.JSON(http.StatusUnauthorized, map[string]string{"error": "Unauthorized"})
 						}
-						return c.Render(http.StatusOK, "index.html", map[string]any{
-							"Title":         "RascalRAT Console",
-							"Unauthorized": true,
-						})
+						return c.File("public/index.html")
 					}
 					return next(c)
 				}

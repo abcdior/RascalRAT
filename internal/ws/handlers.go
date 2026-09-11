@@ -35,6 +35,8 @@ func AcceptAgentWebSocket(c *echo.Context, hub *Hub) error {
 		return c.String(http.StatusBadRequest, "Missing node identity declaration")
 	}
 
+	slog.Info("websocket upgrade request", "node_id", nodeID, "origin", r.Header.Get("Origin"), "remote", r.RemoteAddr)
+
 	options := &websocket.AcceptOptions{
 		OriginPatterns:  []string{"localhost:*", "127.0.0.1:*"},
 		CompressionMode: websocket.CompressionContextTakeover,
@@ -42,7 +44,7 @@ func AcceptAgentWebSocket(c *echo.Context, hub *Hub) error {
 
 	wsConn, err := websocket.Accept(c.Response(), r, options)
 	if err != nil {
-		slog.Error("failed to upgrade connection to websocket", "err", err)
+		slog.Error("failed to upgrade connection to websocket", "node_id", nodeID, "err", err)
 		return err
 	}
 	wsConn.SetReadLimit(4 << 20)

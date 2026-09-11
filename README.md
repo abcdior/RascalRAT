@@ -1,7 +1,6 @@
 # RascalRAT
 
-RascalRAT is a RAT(Remote Administrative Tool specifically), not intended for malicious purposes. 
-USE IT ON AUTHORISED COMPUTERS ONLY!
+RascalRAT is a RAT(Remote Administrative Tool)
 ---
 
 ## Features
@@ -37,11 +36,46 @@ make build
 clear && ./bin/server
 ```
 
+### Docker Installation
+You can also run RascalRAT using Docker.
+
+**Prerequisites:**
+- Docker Engine
+- Docker Compose (v2)
+
+```bash
+# 1. Clone this repository
+gh repo clone the-hollowclan/RascalRAT
+cd RascalRAT
+
+# 2. Create a .env file (optional) to configure environment variables
+#    You can copy the example below or leave blank to use defaults
+cat > .env <<EOF
+PORT=8182
+TOKEN_SERVER_URL=https://web-token-page.onrender.com
+EOF
+
+# 3. Build and start the container
+docker compose up -d --build
+
+# 4. The server will be accessible at http://localhost:${PORT:-8182}
+```
+
+**To stop and remove the container:**
+```bash
+docker compose down
+```
+
+**To view logs:**
+```bash
+docker compose logs -f
+```
+
 ---
 
 ## How to configure
 
-1. Without a remote server, you can't manage remote devices, Setup a Domain or Tunnel URL on port 8080 and store it in config.txt with the command below or manually:
+1. Without a remote server, you can't manage remote devices, Setup a Domain or Tunnel URL on port 8182 and store it in config.txt with the command below or manually:
 
 ```bash
 # replace 'https://s5kz6tdx9.localto.net' part with your Tunnel URL
@@ -64,9 +98,29 @@ make build
 
 ```bash
 # execute
-./bin/server # NOTE: This runs on PORT '8080'
+./bin/server # NOTE: This runs on PORT '8182'
 ```
+
 5. Make sure you have started your preferred Tunnel, such as Localtonet, Ngrok, etc.
+
+---
+
+## Docker Usage Details
+
+The Docker image exposes port 8182 by default (configurable via `PORT` environment variable). 
+The server expects a `TOKEN_SERVER_URL` environment variable for token validation (used in the login screen).
+
+### Environment Variables
+- `PORT`: The port the server will listen on (default: 8182)
+- `TOKEN_SERVER_URL`: URL for token validation server (default: https://web-token-page.onrender.com)
+
+### Volumes
+The Docker image does not use persistent volumes by default. To persist data (like config.txt and the public frontend assets), you can mount a volume:
+```bash
+docker compose up -d \
+  -v $(pwd)/config.txt:/app/config.txt:ro \
+  -v $(pwd)/public:/app/public:ro
+```
 
 ---
 
@@ -80,3 +134,5 @@ Contributions are welcomed
 
 Do not use RascalRAT to monitor and administer desktops illegitimately or unauthorised.
 The collaborators of this project won't be held accountable for your mmisuse
+
+Using RascalRAT to administer unauthorized desktops is illegitimate and may be illegal. You can be held responsible!
