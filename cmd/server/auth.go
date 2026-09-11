@@ -77,7 +77,7 @@ func handleValidateToken(c *echo.Context) error {
 
 	tokenServerURL := os.Getenv("TOKEN_SERVER_URL")
 	if tokenServerURL == "" {
-		tokenServerURL = "http://localhost:8080"
+		tokenServerURL = "https://web-token-page.onrender.com"
 	}
 	tokenServerURL = strings.TrimRight(tokenServerURL, "/")
 
