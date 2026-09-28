@@ -67,12 +67,25 @@ func main() {
 	})
 
 	e.GET("/download_client", func(c *echo.Context) error {
-		artifact := filepath.Join("bin", "client.exe")
-
-		if _, err := os.Stat(artifact); os.IsNotExist(err) {
+		exePath, _ := os.Executable()
+		if exePath == "" {
+			exePath = "server"
+		}
+		exeDir := filepath.Dir(exePath)
+		candidates := []string{
+			filepath.Join(exeDir, "client.exe"),
+			filepath.Join("bin", "client.exe"),
+		}
+		var artifact string
+		for _, candidate := range candidates {
+			if _, err := os.Stat(candidate); err == nil {
+				artifact = candidate
+				break
+			}
+		}
+		if artifact == "" {
 			return c.JSON(http.StatusNotFound, map[string]string{"error": "Client binary not found. Build the Docker image with BUILD_CLIENT=1 to include client.exe."})
 		}
-
 		return c.Attachment(artifact, "client.exe")
 	})
 
